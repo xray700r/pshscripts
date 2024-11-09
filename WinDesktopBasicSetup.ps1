@@ -1,7 +1,7 @@
 
 <#PSScriptInfo
 
-.VERSION 2.7.0
+.VERSION 2.7.1
 
 .GUID e06b75b3-cb61-441c-a80a-358b28ae7e53
 
@@ -27,9 +27,8 @@
 
 .RELEASENOTES
 
-In the 2.7.0 release:
-- Moved the reset of the App store and winget installation of LAPS before winget starts to be used to make a first install and get direct feedback if it works 
-
+In the 2.7.1 release:
+- Automated publish from repo with PS Script analyzer and Injection analyzer validation and quality gates
 
 Script was tested with Windows 10 22H2, Windows 11 22H2 and 23H2 before release. Extended support for Windows 10 and 11 IOT LTSC.
 
