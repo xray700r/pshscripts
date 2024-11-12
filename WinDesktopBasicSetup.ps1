@@ -1,7 +1,7 @@
 
 <#PSScriptInfo
 
-.VERSION 2.7.1
+.VERSION 2.7.2
 
 .GUID e06b75b3-cb61-441c-a80a-358b28ae7e53
 
@@ -27,12 +27,27 @@
 
 .RELEASENOTES
 
-In the 2.7.1 release:
-- Automated publish from repo with PS Script analyzer and Injection analyzer validation and quality gates
+In the 2.7.2 release:
+- Added warnings for the actions that will be undertaken on default local users Guest, User and Administrator
+- Removed the Timezone setting automatically and added a function to detect timezones by public IP. The output will be printed as a warning suggestion to the user if his current timezone is not correct.
 
-Script was tested with Windows 10 22H2, Windows 11 22H2 and 23H2 before release. Extended support for Windows 10 and 11 IOT LTSC.
+Script was tested with the following before release:
+- Windows 10 22H2, 
+- Windows 11 22H2 and 23H2,
+- Windows 10 and 11 IOT LTSC.
 
 Security baselines are retrieved from the DISA STIG security guidelines, MITRE security guidelines and Microsoft security baselines.
+
+WARNING!!!: 
+0. For the Update section of the script to work properly your Windows OS should be activated and be capable of receiving updates from microsoft.com
+1. This script will disable the following usernames of local accounts if found: Guest, User (highly reccomended).
+2. This script will change the default name the following usernames of local accounts if found: from Guest to LocalGuest, from Administrator to LocalAdmin (highly reccomended).
+3. This script will enable dhe Microsoft Firewall (highly reccomended). You have to manually open TCP/IP ports if you need them.
+4. This script will remove any administrative SMB/CIFS shares that you have shared over the network (highly reccomended).
+5. This script will enable Microsoft Defender Antivirus (highly reccomended).
+6. This script will disable the Xbox services used for gaming (impacts only gamers).
+7. This script will remove TFTP and TELNET features from Windows OS (highly reccomended).
+8. This script will change the Windows OS active hours from 08:00 to 23:00 or 8 AM to 11 PM
 
 Disclaimer: Use responsibly and with caution on Windows OS 10/11. 
             Security settings may limit or impair functionalities to which you are accustomed.
@@ -238,14 +253,33 @@ function WingetCheckandFix($version) {
   
 }
 
+function GetCompareTimezone () {
 
+  $tmzfrompublicip=(Invoke-WebRequest -uri "https://ipinfo.io/timezone").Content
+
+  $possibletimezones=Get-TimeZone -ListAvailable | Where-Object Id -match $(Split-Path -Path $tmzfrompublicip -Parent) | Select-Object Id
+
+  $currentsystemtimezone=$(Get-TimeZone | Select-Object Id)
+
+  if ( $possibletimezones.Id -contains $currentsystemtimezone.Id ) {Write-Output "Your current system timezone is within the suggested timezones deduced from your public IP!"} 
+  else {Write-Warning "Your current system timezone is not within the suggested timezones deduced from your public IP! If this is an error change through you system settings!"}
+
+}
 ### End Functions block
+Write-Warning "For the Update section of the script to work properly your Windows OS should be activated and be capable of receiving updates from microsoft.com"
+Write-Warning "This script will disable the following usernames of local accounts if found: Guest, User (highly reccomended)."
+Write-Warning "This script will change the default name the following usernames of local accounts if found: from Guest to LocalGuest, from Administrator to LocalAdmin (highly reccomended)."
+Write-Warning "This script will enable dhe Microsoft Firewall (highly reccomended). You have to manually open TCP/IP ports if you need them."
+Write-Warning "This script will remove any administrative SMB/CIFS shares that you have shared over the network (highly reccomended)."
+Write-Warning "This script will enable Microsoft Defender Antivirus (highly reccomended)."
+Write-Warning "This script will disable the Xbox services used for gaming (impacts only gamers)."
+Write-Warning "This script will remove TFTP and TELNET features from Windows OS (highly reccomended)."
+Write-Warning "This script will change the Windows OS active hours from 08:00 to 23:00 or 8 AM to 11 PM."
 
+### Timezone suggestion
 
+GetCompareTimezone
 
-### "Set Correct Timezone"
-Set-timezone -Name 'Central Europe Standard Time' -PassThru
- 
 ### "Remove Hybernation and Fast Startup"
  
 powercfg /hibernate off
@@ -1379,4 +1413,3 @@ else {
   winget upgrade --all --accept-package-agreements --force --silent
 
 }
-
