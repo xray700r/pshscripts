@@ -83,7 +83,7 @@ steps:
     targetType: inline
     workingDirectory: '$(Build.ArtifactStagingDirectory)'
     script: >-
-        pwsh -Command "Publish-Script -Path .\WinServerBasicSetup.ps1 -NuGetApiKey $(NugetAPIKey2)"
+        pwsh -Command "Publish-Script -Path .\WinServerBasicSetup.ps1 -NuGetApiKey $(NugetAPIKey1)"
 
     failOnStderr: true
 - task: DeleteFiles@1
