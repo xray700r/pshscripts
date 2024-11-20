@@ -1,7 +1,7 @@
 
 <#PSScriptInfo
 
-.VERSION 2.3.0
+.VERSION 2.3.1
 
 .GUID 65998942-625b-44f1-8a51-88e71854145d
 
@@ -26,15 +26,9 @@
 .EXTERNALSCRIPTDEPENDENCIES
 
 .RELEASENOTES
-In release 2.3.0:
-- Added support for customized MDE settings
-- Added configuration option for default gateway and subnet prefix when setting IP 
-- Added chocolatey installation
-- Added LAPS installation
-- Added Microsoft Windows Terminal packages installation
-- Added Firewall rules for unused or vulnerable services
-- Added Uninstall and disable vulnerable services
-- Added ASR rules reccomended by Microsoft
+In release 2.3.1:
+- Added PSWindowsUpdate module installation
+- Added Windows update options in local registry
 
 
 .PRIVATEDATA
@@ -283,7 +277,7 @@ $MDAstatus = $(Get-MpComputerStatus | Select-Object AntivirusEnabled, Initializa
  
 if ($MDAstatus.AntivirusEnabled -ne $True -and $MDAstatus.InitializationProgress -ne "ServiceStartedSuccessfully" -and $MDAstatus.AMRunningMode -ne "Normal") {
  
-  Write-Warning "Microsoft Defender not in normal running mode!"
+    Write-Warning "Microsoft Defender not in normal running mode!"
   
 }
 
@@ -399,6 +393,48 @@ choco install LAPS -y
 Write-Output "Install Microsoft Windows Terminal packages"
 
 choco install microsoft-windows-terminal -y
+
+
+### Install PSWindows Update module
+
+Write-Output "Check then Install Windows Update PS module" 
+Write-Warning "Proceeding with installation of third party PSWindowsUpdate!" 
+Import-Module PackageManagement
+Install-PackageProvider -Name NuGet -Force
+Install-Module PSWindowsUpdate -Force 
+
+
+## Windows Update settings
+
+### Enable automatic updates
+CreateRegEntry -rkeypath 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU' -rkeyname NoAutoUpdate -rkeytype 'DWord' -rkeyvalue 0
+
+### Enable Automatically download and scheduled installation
+CreateRegEntry -rkeypath 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU' -rkeyname AUOptions -rkeytype 'DWord' -rkeyvalue 4
+
+### Schedule update install on Wednesday
+CreateRegEntry -rkeypath 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU' -rkeyname ScheduledInstallDay -rkeytype 'DWord' -rkeyvalue 5
+
+### Schedule install time at 21:00 or 9PM
+CreateRegEntry -rkeypath 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU' -rkeyname ScheduledInstallTime -rkeytype 'DWord' -rkeyvalue 20
+
+### Disable WSUS Server
+CreateRegEntry -rkeypath 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU' -rkeyname UseWUServer -rkeytype 'DWord' -rkeyvalue 0
+
+### Enable reboot when user is logged in
+CreateRegEntry -rkeypath 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU' -rkeyname NoAutoRebootWithLoggedOnUsers -rkeytype 'DWord' -rkeyvalue 0
+
+if ( $(Test-Path -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired") -or $(Test-Path -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending")) 
+
+{ Write-Warning "Reboot Pending! You will have to reboot then apply another Windows Update manually or through:  Install-WindowsUpdate -MicrosoftUpdate -AcceptAll " } 
+
+else {
+    Write-Warning "No Reboot Pending!"
+
+    Write-Warning "Proceeding with installation of Windows Updates! System will reboot at the end of the update process!!!"
+    Import-Module PSWindowsUpdate
+    Install-WindowsUpdate -MicrosoftUpdate -AcceptAll
+}
 
 
 if ( -not [string]::IsNullOrEmpty( $hostname ) ) {
