@@ -9,7 +9,7 @@ trigger:
     - main
   paths:
     include:
-    - ./WinDesktopBasicSetup.ps1
+    - WinDesktopBasicSetup.ps1
 pool:
     name: LinuxBuild2
 
