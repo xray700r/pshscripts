@@ -4,8 +4,12 @@
 # https://aka.ms/yaml
 
 trigger:
-- main
-
+  branches:
+    include:
+    - main
+  paths:
+    include:
+    - ./WinDesktopBasicSetup.ps1
 pool:
     name: LinuxBuild2
 
