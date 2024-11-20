@@ -9,7 +9,7 @@ trigger:
     - main
   paths:
     include:
-    - WinDesktopBasicSetup.ps1
+    - windowsdesktop
 pool:
     name: LinuxBuild2
 
@@ -46,7 +46,7 @@ steps:
         
         pwsh -Command "Import-Module -Name PSScriptAnalyzer"
 
-        pwsh -Command "Invoke-ScriptAnalyzer -Path ./WinDesktopBasicSetup.ps1 -Profile ./PSAnalyzerProfileError.txt -Recurse"
+        pwsh -Command "Invoke-ScriptAnalyzer -Path ./windowsdesktop/WinDesktopBasicSetup.ps1 -Profile ./PSAnalyzerProfileError.txt -Recurse"
 
     failOnStderr: true
 - task: Bash@3
@@ -61,7 +61,7 @@ steps:
         
         pwsh -Command "Import-Module -Name PSScriptAnalyzer"
 
-        pwsh -Command "Invoke-ScriptAnalyzer ./WinDesktopBasicSetup.ps1 | Select-Object Severity, Line, Message, RuleName | Format-List"
+        pwsh -Command "Invoke-ScriptAnalyzer ./windowsdesktop/WinDesktopBasicSetup.ps1 | Select-Object Severity, Line, Message, RuleName | Format-List"
 
     failOnStderr: true
 
@@ -77,7 +77,7 @@ steps:
         
         pwsh -Command "Import-Module -Name InjectionHunter"
 
-        pwsh -Command "Invoke-ScriptAnalyzer ./WinDesktopBasicSetup.ps1 -CustomRulePath (Get-Module InjectionHunter -List | % Path) -v | Format-List"
+        pwsh -Command "Invoke-ScriptAnalyzer ./windowsdesktop/WinDesktopBasicSetup.ps1 -CustomRulePath (Get-Module InjectionHunter -List | % Path) -v | Format-List"
 
     failOnStderr: true
 - task: Bash@3
@@ -87,7 +87,7 @@ steps:
     targetType: inline
     workingDirectory: '$(Build.ArtifactStagingDirectory)'
     script: >-
-        pwsh -Command "Publish-Script -Path .\WinDesktopBasicSetup.ps1 -NuGetApiKey $(NugetAPIKey)"
+        pwsh -Command "Publish-Script -Path .\windowsdesktop\WinDesktopBasicSetup.ps1 -NuGetApiKey $(NugetAPIKey)"
 
     failOnStderr: true
 - task: DeleteFiles@1
