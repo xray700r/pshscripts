@@ -1,7 +1,7 @@
 
 <#PSScriptInfo
 
-.VERSION 2.7.2
+.VERSION 2.8.0
 
 .GUID e06b75b3-cb61-441c-a80a-358b28ae7e53
 
@@ -27,9 +27,10 @@
 
 .RELEASENOTES
 
-In the 2.7.2 release:
-- Added warnings for the actions that will be undertaken on default local users Guest, User and Administrator
-- Removed the Timezone setting automatically and added a function to detect timezones by public IP. The output will be printed as a warning suggestion to the user if his current timezone is not correct.
+In the 2.8.0 release:
+- Added module installation and import function
+- Added path checking function to avoid creating folders and saving reports to protected system folders
+- Installed applications csv file is checked and saved in a date versioned location
 
 Script was tested with the following before release:
 - Windows 10 22H2, 
@@ -73,11 +74,71 @@ Param()
  
 
 ### Start Functions block
+function CheckPath ($PathToCheck) { 
+        
+  [bool] $ispathOK = $false
+  $basepaths = @('Program Files', 'Program Files (x86)', 'Windows', 'inetpub', 'wwwroot', 'PerfLogs', 'azagent')
+
+  if (Split-Path -Path $PathToCheck -IsAbsolute) {
+  
+      if (-not ($PathToCheck.split("\")[1] -in $basepaths)) {
+        
+          $ispathOK = $true
+
+      }
+      else {
+          Write-Warning " The provided path is in a Windows OS files protected path!"
+          $ispathOK = $false
+      }
+      
+  }
+  else {
+
+      Write-Warning " The provided path is not absolute! This is not good practice for generating folders or saving files!"
+      $ispathOK = $false
+  }
+
+  return $ispathOK
+
+}
+
 Function GenerateFolder($path) {
     
-  If (!(Test-Path $path)) {
-    New-Item -ItemType Directory -Force -Path $path
+  if (!(Test-Path $path)) {
+
+    if (CheckPath $path ){New-Item -ItemType Directory -Force -Path $path}
+    
   }
+}
+
+function CheckandInstallModule ($ModuleName) {
+
+  $ModuleStrMatch = $ModuleName.ToString()
+
+  If (![string]::IsNullOrEmpty($(Get-InstalledModule | Where-Object Name -match $ModuleStrMatch | Select-Object Name))) {
+
+      Write-Warning "Module: $ModuleStrMatch is already installed! Importing module in current session!";
+
+      Write-Host "Importing Module: $ModuleStrMatch " -ForegroundColor Green
+
+      try {
+          Import-Module -Name $ModuleStrMatch -Force -ErrorAction Stop
+          
+      }
+      catch { Write-Warning "Failed: Importing $ModuleStrMatch " }
+
+  }
+  else {
+
+          Write-Warning "Module $ModuleStrMatch is not installed!"
+          Write-Host "Installing Module: $ModuleStrMatch " -ForegroundColor Green
+          Install-Module -Name $ModuleStrMatch -AllowClobber -Force                
+
+          Write-Host "Importing Module: $ModuleStrMatch " -ForegroundColor Green
+          Import-Module -Name $ModuleStrMatch -Force -ErrorAction Stop
+                      
+  }
+
 }
 
 Function TestPathTo($pathto, $keyname) {
@@ -1324,7 +1385,7 @@ if (-not [string]::IsNullOrEmpty( $disable_shares )) {
     }
 
 foreach ($dis_share in $disable_shares) {        
-        if (-not [string]::IsNullOrEmpty( $dis_share ) -and  $dont_disable_shares -notcontains $dis_share){  
+        if (-not [string]::IsNullOrEmpty( $dis_share ) -and  $dont_disable_shares -notcontains $dis_share){ 
         Write-Warning "Test passed and is OK to Remove Share: $dis_share"                        
         RemoveSMBShare $dis_share 
         }
@@ -1336,15 +1397,23 @@ foreach ($dis_share in $disable_shares) {
 
 Write-Output "Check then Install Windows Update PS module" 
 Write-Warning "Proceeding with installation of third party PSWindowsUpdate!" 
-Import-Module PackageManagement
+CheckandInstallModule "PackageManagement"
 Install-PackageProvider -Name NuGet -Force
-Install-Module PSWindowsUpdate -Force 
+CheckandInstallModule "PSWindowsUpdate"
 
 
 ### "List and export to CSV installed Appx packages"
+$uniquename =$(Get-Date -Format "MM.dd.yyyy_HH.mm");   
+
+$savepath="$HOME/$uniquename";
+
+GenerateFolder $savepath;
+
 $AppList = $(Get-AppxPackage | Select-Object Name , Version)
  
-$AppList | Export-CSV "$HOME/$env:computername.csv" -NoTypeInformation
+$AppList | Export-CSV "$savepath/$env:computername.csv" -NoTypeInformation
+
+Write-Host "Report with the installed applications will be written to file: $savepath/$env:computername.csv "
 
 ## Windows Update settings
 
@@ -1369,7 +1438,7 @@ CreateRegEntry -rkeypath 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdat
 
 
 Write-Warning "Proceeding with installation of Windows Updates! System will reboot at the end of the update process!!!"
-Import-Module PSWindowsUpdate
+
 Install-WindowsUpdate -MicrosoftUpdate -AcceptAll
 
 

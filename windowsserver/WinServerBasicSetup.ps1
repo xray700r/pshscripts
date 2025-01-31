@@ -1,7 +1,7 @@
 
 <#PSScriptInfo
 
-.VERSION 2.3.1
+.VERSION 2.4.0
 
 .GUID 65998942-625b-44f1-8a51-88e71854145d
 
@@ -26,9 +26,11 @@
 .EXTERNALSCRIPTDEPENDENCIES
 
 .RELEASENOTES
-In release 2.3.1:
-- Added PSWindowsUpdate module installation
-- Added Windows update options in local registry
+In release 2.4.0:
+- Added module installation and import function
+- Added path checking function to avoid creating folders and saving reports to protected system folders
+- Removed obsolete domain joining step for Windows Server OS
+- Added checking for local domain joinin and setting of static IP address with primary domain controller and secondary domain controller as DNS when available if not set DNS passed when calling script
 
 
 .PRIVATEDATA
@@ -50,7 +52,7 @@ Param ([Parameter(Mandatory = $False, Position = 1)]
     [Parameter(Mandatory = $False, Position = 4)]
     [string] $hostname,
     [Parameter(Mandatory = $False, Position = 5)]
-    [string] $domainname
+    [string] $dnsserver
 )
 
 #Requires -Version 4
@@ -64,6 +66,75 @@ Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' 
 #Enable NLA
 Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name SecurityLayer -value 1
 Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name UserAuthentication -value 1
+
+
+
+function CheckPath ($PathToCheck) { 
+        
+    [bool] $ispathOK = $false
+    $basepaths = @('Program Files', 'Program Files (x86)', 'Windows', 'inetpub', 'wwwroot', 'PerfLogs', 'azagent')
+  
+    if (Split-Path -Path $PathToCheck -IsAbsolute) {
+    
+        if (-not ($PathToCheck.split("\")[1] -in $basepaths)) {
+          
+            $ispathOK = $true
+  
+        }
+        else {
+            Write-Warning " The provided path is in a Windows OS files protected path!"
+            $ispathOK = $false
+        }
+        
+    }
+    else {
+  
+        Write-Warning " The provided path is not absolute! This is not good practice for generating folders or saving files!"
+        $ispathOK = $false
+    }
+  
+    return $ispathOK
+  
+}
+  
+Function GenerateFolder($path) {
+      
+    if (!(Test-Path $path)) {
+  
+        if (CheckPath $path ) { New-Item -ItemType Directory -Force -Path $path }
+      
+    }
+}
+  
+function CheckandInstallModule ($ModuleName) {
+  
+    $ModuleStrMatch = $ModuleName.ToString()
+  
+    If (![string]::IsNullOrEmpty($(Get-InstalledModule | Where-Object Name -match $ModuleStrMatch | Select-Object Name))) {
+  
+        Write-Warning "Module: $ModuleStrMatch is already installed! Importing module in current session!";
+  
+        Write-Host "Importing Module: $ModuleStrMatch " -ForegroundColor Green
+  
+        try {
+            Import-Module -Name $ModuleStrMatch -Force -ErrorAction Stop
+            
+        }
+        catch { Write-Warning "Failed: Importing $ModuleStrMatch " }
+  
+    }
+    else {
+  
+        Write-Warning "Module $ModuleStrMatch is not installed!"
+        Write-Host "Installing Module: $ModuleStrMatch " -ForegroundColor Green
+        Install-Module -Name $ModuleStrMatch -AllowClobber -Force                
+  
+        Write-Host "Importing Module: $ModuleStrMatch " -ForegroundColor Green
+        Import-Module -Name $ModuleStrMatch -Force -ErrorAction Stop
+                        
+    }
+  
+}
 
 function DisableRule($dname) {	
     if ( -not [string]::IsNullOrEmpty( $dname ) ) {
@@ -399,9 +470,9 @@ choco install microsoft-windows-terminal -y
 
 Write-Output "Check then Install Windows Update PS module" 
 Write-Warning "Proceeding with installation of third party PSWindowsUpdate!" 
-Import-Module PackageManagement
+CheckandInstallModule "PackageManagement"
 Install-PackageProvider -Name NuGet -Force
-Install-Module PSWindowsUpdate -Force 
+CheckandInstallModule "PSWindowsUpdate"
 
 
 ## Windows Update settings
@@ -432,7 +503,7 @@ else {
     Write-Warning "No Reboot Pending!"
 
     Write-Warning "Proceeding with installation of Windows Updates! System will reboot at the end of the update process!!!"
-    Import-Module PSWindowsUpdate
+    CheckandInstallModule "PSWindowsUpdate"
     Install-WindowsUpdate -MicrosoftUpdate -AcceptAll
 }
 
@@ -455,30 +526,41 @@ if ( -not [string]::IsNullOrEmpty( $hostname ) ) {
 
 }
 
-if ( -not [string]::IsNullOrEmpty( $domainname) ) {
+if ( -not [string]::IsNullOrEmpty( $ipaddress) ) {
 
-    $domaincontroller = $(Get-ADDomainController -Discover -Domain $domainname | Select-Object -Expandproperty IPv4Address)
+    if ([string]::IsNullOrEmpty( $env:USERDNSDOMAIN)) { Write-Warning "You are NOT in a local Active Directory domain joined device!" }
+    else {
+        Write-Warning "You are in a local Active Directory domain joined device! Searching for domain controllers will initiate!"
 
-    if ( (-not [string]::IsNullOrEmpty( $ipaddress )) -and (-not [string]::IsNullOrEmpty($defaultgateway))) {
+        Install-WindowsFeature RSAT-AD-PowerShell
+     
+        $primarydomaincontroller = $(Get-ADDomainController -Discover -Domain $env:USERDNSDOMAIN -Service "PrimaryDC", "TimeService" | Select-Object -Expandproperty IPv4Address)
+     
+        $dcontrollers = $(Get-ADDomainController -filter * | Select-Object IPv4Address)
 
-        Get-NetAdapter -Name Ethernet | New-NetIPAddress -IPAddress $ipaddress -DefaultGateway $defaultgateway -PrefixLength $prefix
+        if ($dcontrollers.length -gt 1) { $secondarydns = $dcontrollers[1] } 
         
-        $ifindexprop = $(Get-NetAdapter -Name Ethernet | Select-object -Expandproperty InterfaceIndex)
+        else {
+            if (-not [string]::IsNullOrEmpty( $dnsserver)) { $secondarydns = $dnsserver } 
         
-        Set-DNSClientServerAddress -InterfaceIndex $ifindexprop -ServerAddresses $domaincontroller, 1.1.1.1
+            else { $secondarydns = "1.1.1.1" } 
         
+        }
+
+
+        Write-Warning "Primary Domain Name Server: $primarydomaincontroller ; Secondary Domain Name Server: $secondarydns ;"
+    
+        if ( -not [string]::IsNullOrEmpty($defaultgateway)) {
+
+            Get-NetAdapter -Name Ethernet | New-NetIPAddress -IPAddress $ipaddress -DefaultGateway $defaultgateway -PrefixLength $prefix
+        
+            $ifindexprop = $(Get-NetAdapter -Name Ethernet | Select-object -Expandproperty InterfaceIndex)
+        
+            Set-DNSClientServerAddress -InterfaceIndex $ifindexprop -ServerAddresses $primarydomaincontroller, $secondarydns
+        
+        }
+        else { Write-Warning "Please provide both the static IP to set and the default gateway you want to set for the Network interface!" }
+    
     }
-    else { Write-Warning "Please provide the IP and the default gateway you want to set for the Network interface!" }
-
-    if ([string]::IsNullOrEmpty( $domaincred )) {
-
-        $domaincred = $(Get-Credential)
-
-    }
-    else { Write-Host "Using already input credentials!" }
-
-
-
-    Add-Computer -domainname $domainname -Credential $domaincred -Restart
 
 }
