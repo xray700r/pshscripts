@@ -1,7 +1,7 @@
 
 <#PSScriptInfo
 
-.VERSION 2.8.0
+.VERSION 2.8.1
 
 .GUID e06b75b3-cb61-441c-a80a-358b28ae7e53
 
@@ -27,10 +27,9 @@
 
 .RELEASENOTES
 
-In the 2.8.0 release:
-- Added module installation and import function
-- Added path checking function to avoid creating folders and saving reports to protected system folders
-- Installed applications csv file is checked and saved in a date versioned location
+In the 2.8.1 release:
+- Added Enable 'Local Security Authority (LSA) protection'
+- 
 
 Script was tested with the following before release:
 - Windows 10 22H2, 
@@ -741,6 +740,10 @@ CreateRegEntry -rkeypath 'HKLM:\SYSTEM\CurrentControlSet\Control\Lsa\MSV1_0' -rk
 ### The system must be configured to meet the minimum session security requirement for NTLM SSP based servers
 
 CreateRegEntry -rkeypath 'HKLM:\SYSTEM\CurrentControlSet\Control\Lsa\MSV1_0' -rkeyname NTLMMinServerSec -rkeytype 'DWord' -rkeyvalue 537395200
+
+### Enable 'Local Security Authority (LSA) protection'
+
+CreateRegEntry -rkeypath 'HKLM:\SYSTEM\CurrentControlSet\Control\Lsa' -rkeyname RunAsPPL -rkeytype 'DWord' -rkeyvalue 1
 
 ### The default permissions of global system objects must be increased
 
