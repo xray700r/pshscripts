@@ -1,7 +1,7 @@
 
 <#PSScriptInfo
 
-.VERSION 2.8.1
+.VERSION 2.8.2
 
 .GUID e06b75b3-cb61-441c-a80a-358b28ae7e53
 
@@ -27,9 +27,13 @@
 
 .RELEASENOTES
 
-In the 2.8.1 release:
-- Added Enable 'Local Security Authority (LSA) protection'
-- 
+In the 2.8.2 release:
+- Added higher maximum Eventlog limits for system security and applications
+- Added Accessibility flags for disabling vulnerable options to disable ToggleKeys, StickyKeys and Keyboard Response
+- Added sisabling of ShowTabletKeyboard on logon screen
+- Added UAC enabling
+- Added Autoshare disabling
+- Added DisableRestrictedAdmin for LSA
 
 Script was tested with the following before release:
 - Windows 10 22H2, 
@@ -475,9 +479,13 @@ WingetCheckandFix "v1.9"
 
 ### Registry options are being applied
 
-### "The Application event log size must be configured to 32768 KB or greater"
-CreateRegEntry -rkeypath 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\EventLog\Application' -rkeyname MaxSize -rkeytype 'DWord' -rkeyvalue 32768
+### "The Application event log size must be configured to 32768 KB or greater" "System and Security log also expanded"
 
+CreateRegEntry -rkeypath 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\EventLog\Application' -rkeyname MaxSize -rkeytype 'DWord' -rkeyvalue 0x19000
+
+CreateRegEntry -rkeypath 'HKLM:\Software\Policies\Microsoft\Windows\Eventlog\Security' -rkeyname MaxSize -rkeytype 'DWord' -rkeyvalue 0x64000
+
+CreateRegEntry -rkeypath 'HKLM:\Software\Policies\Microsoft\Windows\Eventlog\System' -rkeyname MaxSize -rkeytype 'DWord' -rkeyvalue 0x19000
 
 ### "Disable RDP"
 CreateRegEntry -rkeypath 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -rkeyname fDenyTSConnections -rkeytype 'DWord' -rkeyvalue 1
@@ -745,6 +753,13 @@ CreateRegEntry -rkeypath 'HKLM:\SYSTEM\CurrentControlSet\Control\Lsa\MSV1_0' -rk
 
 CreateRegEntry -rkeypath 'HKLM:\SYSTEM\CurrentControlSet\Control\Lsa' -rkeyname RunAsPPL -rkeytype 'DWord' -rkeyvalue 1
 
+### Disable Restricted Admin mode
+CreateRegEntry -rkeypath 'HKLM:\System\CurrentControlSet\Control\Lsa' -rkeyname DisableRestrictedAdmin -rkeytype 'DWord' -rkeyvalue 0
+
+### Enable UAC
+
+CreateRegEntry -rkeypath 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System' -rkeyname EnableUAC -rkeytype 'DWord' -rkeyvalue 1
+
 ### The default permissions of global system objects must be increased
 
 CreateRegEntry -rkeypath 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager' -rkeyname ProtectionMode -rkeytype 'DWord' -rkeyvalue 1
@@ -816,6 +831,26 @@ CreateRegEntry -rkeypath 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\Network Conn
 ### Microsoft consumer experiences must be turned off
 
 CreateRegEntry -rkeypath 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CloudContent' -rkeyname DisableWindowsConsumerFeatures -rkeytype 'DWord' -rkeyvalue 1
+
+### Disable Accessibility options to lower the number of possible attacks using these options
+
+CreateRegEntry -rkeypath 'HKCU:\Control Panel\Accessibility\ToggleKeys' -rkeyname Flags -rkeytype 'String' -rkeyvalue 58
+
+CreateRegEntry -rkeypath 'HKCU:\Control Panel\Accessibility\StickyKeys' -rkeyname Flags -rkeytype 'String' -rkeyvalue 506
+
+CreateRegEntry -rkeypath 'HKCU:\Control Panel\Accessibility\Keyboard Response' -rkeyname Flags -rkeytype 'String' -rkeyvalue 122
+
+CreateRegEntry -rkeypath 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Authentication\LogonUI' -rkeyname ShowTabletKeyboard -rkeytype 'DWord' -rkeyvalue 0
+
+### Disable the run once list on local machine (More testing needed)
+
+# CreateRegEntry -rkeypath 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer' -rkeyname DisableLocalMachineRunOnce -rkeytype 'DWord' -rkeyvalue 1
+
+### Disable autosharing from Windows OS
+
+CreateRegEntry -rkeypath 'HKLM:\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters' -rkeyname AutoShareServer -rkeytype 'DWord' -rkeyvalue 0
+
+CreateRegEntry -rkeypath 'HKLM:\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters' -rkeyname AutoShareWks -rkeytype 'DWord' -rkeyvalue 0
 
 ### Windows 10/11 should be configured to prevent users from receiving suggestions for third-party or additional applications
 
