@@ -1,7 +1,7 @@
 
 <#PSScriptInfo
 
-.VERSION 2.8.2
+.VERSION 2.8.3
 
 .GUID e06b75b3-cb61-441c-a80a-358b28ae7e53
 
@@ -27,17 +27,14 @@
 
 .RELEASENOTES
 
-In the 2.8.2 release:
-- Added higher maximum Eventlog limits for system security and applications
-- Added Accessibility flags for disabling vulnerable options to disable ToggleKeys, StickyKeys and Keyboard Response
-- Added sisabling of ShowTabletKeyboard on logon screen
-- Added UAC enabling
-- Added Autoshare disabling
-- Added DisableRestrictedAdmin for LSA
+In the 2.8.3 release:
+- Added Windows Defender Application Control (WDAC)  policy application alongside Applocker
+- Added Exploit Protection policy import
+- Added additional warning for the lockout settings applied
 
 Script was tested with the following before release:
 - Windows 10 22H2, 
-- Windows 11 22H2 and 23H2,
+- Windows 11 22H2, 23H2, 24H2,
 - Windows 10 and 11 IOT LTSC.
 
 Security baselines are retrieved from the DISA STIG security guidelines, MITRE security guidelines and Microsoft security baselines.
@@ -52,6 +49,7 @@ WARNING!!!:
 6. This script will disable the Xbox services used for gaming (impacts only gamers).
 7. This script will remove TFTP and TELNET features from Windows OS (highly reccomended).
 8. This script will change the Windows OS active hours from 08:00 to 23:00 or 8 AM to 11 PM
+9. This script will insert lockout of 20 minutes for accounts after 5 failed logon attempts and has a reset counter of 30 minutes
 
 Disclaimer: Use responsibly and with caution on Windows OS 10/11. 
             Security settings may limit or impair functionalities to which you are accustomed.
@@ -339,6 +337,7 @@ Write-Warning "This script will enable Microsoft Defender Antivirus (highly recc
 Write-Warning "This script will disable the Xbox services used for gaming (impacts only gamers)."
 Write-Warning "This script will remove TFTP and TELNET features from Windows OS (highly reccomended)."
 Write-Warning "This script will change the Windows OS active hours from 08:00 to 23:00 or 8 AM to 11 PM."
+Write-Warning "This script will insert lockout of 20 minutes for accounts after 5 failed logon attempts and has a reset counter of 30 minutes."
 
 ### Timezone suggestion
 
@@ -1197,6 +1196,36 @@ CreateRegEntry -rkeypath 'HKLM:\SOFTWARE\Policies\Microsoft\WindowsFirewall\Publ
 
 ### Data Execution Prevention (DEP) must be configured to at least OptOut
 BCDEDIT /set "{current}" nx OptOut
+
+### 
+
+if (!(Test-Path "./EP_reset.xml")) {
+
+Set-ProcessMitigation -PolicyFilePath ./EP_reset.xml
+
+## Get-ProcessMitigation -Name OIS.EXE
+
+ }
+
+
+if (!(Test-Path "./WDACpolicy.xml")) {
+
+$WDACPolicyXMLFile = ".\WDACPolicy.xml"
+
+[xml]$WDACPolicy = Get-Content -Path $WDACPolicyXMLFile
+
+if (($WDACPolicy.SiPolicy.PolicyID) -ne $null) { $PolicyID = $WDACPolicy.SiPolicy.PolicyID; $PolicyBinary = $PolicyID+".cip"; } else { $PolicyBinary = "SiPolicy.p7b" }
+
+ConvertFrom-CIPolicy -XmlFilePath $WDACPolicyXMLFile -BinaryFilePath .\$PolicyBinary
+
+$DestinationBinary = $env:windir+"\System32\CodeIntegrity\SiPolicy.p7b"
+
+Copy-Item -Path $PolicyBinary -Destination $DestinationBinary -Force
+
+Invoke-CimMethod -Namespace root\Microsoft\Windows\CI -ClassName PS_UpdateAndCompareCIPolicy -MethodName Update -Arguments @{FilePath = $DestinationBinary}
+
+ }
+
 
 ## Uninstall and disable vulnerable services
 
